@@ -12,7 +12,6 @@ function Intersection() {
 
     // Helper values
     this.normalFlipped = vec4(0,0,0,0);
-    this.relativeRefractIndex = 0;
 }
 
 Intersection.prototype.getPosition = function () {
@@ -25,13 +24,8 @@ Intersection.prototype.isIntersected = function () {
 
 Intersection.prototype.getRefractedRay = function () {
     // Initial refraction
-    var relativeRefractIndex;
-    if (this.ray.isInsideBall) {
-        relativeRefractIndex = this.ball.refract_index;
-    } else {
-        relativeRefractIndex = 1.0 / this.ball.refract_index;
-    }
-    var refraction1 = refract(this.relativeRefractIndex,this.getPosition(),this.ray.dir,this.normal);
+    var relativeRefractIndex = this.ball.refract_index;
+    var refraction1 = refract(relativeRefractIndex,this.getPosition(),this.ray.dir,this.normal);
     return refraction1;
 }
 
@@ -97,8 +91,8 @@ function isInterior(intersection, ray) {
 
 function refract(relative_index, at, I, N) {
     var eta = relative_index;
-    var I = toVec3(I);
-    var N = toVec3(N);
+    var I = normalize(toVec3(I));
+    var N = normalize(toVec3(N));
     var at = toVec3(at);
 
     // DEBUG
@@ -126,22 +120,15 @@ function refract(relative_index, at, I, N) {
     return new Ray(at.concat(1), T.concat(0));
 }
 
-function refractVector(N, I, r) {
-    var I = toVec3(I);
+function reflect(at, V ,N) {
+    var V = toVec3(V);
     var N = toVec3(N);
+    var at = toVec3(at);
 
-    var cosI = -dot(I,N);
-    var sinT2 = r * r * (1.0 - cosI * cosI);
+    var dir = normalize(vec3ToVec4(subtract(scale_vec(2 * dot(N, V), N), V), 0));
+    var origin = vec3ToVec4(at, 1);
 
-    if (sinT2 > 1.0) {
-        throw "Bad refraction vector!";
-    }
-
-    var cosT = Math.sqrt(1.0 - sinT2);
-    var v1 = scale_vec(r, I);
-    var v2 = scale_vec(r * cosI - cosT, N);
-    var T = add(v1,v2);
-    return T;
+    return new Ray(origin, dir);
 }
 
 // CS 174a Project 3 Ray Tracer Skeleton
@@ -436,7 +423,7 @@ Raytracer.prototype.trace = function (ray, number_of_recursions_deep, shadow_tes
     //        instead just store color_remaining, the pixel's remaining potential to be lit up more... proceeding only if that's still significant.
     //        If a light source for shadow testing is provided as the optional final argument, this function's objective simplifies to just
     //        checking the path directly to a light source for obstructions.
-    if(number_of_recursions_deep >= 5)
+    if(number_of_recursions_deep >= 7)
         return mult_3_coeffs(this.ambient, background_functions[curr_background_function](ray)).concat(1);
 
     var closest_intersection = new Intersection();
@@ -472,14 +459,12 @@ Raytracer.prototype.trace = function (ray, number_of_recursions_deep, shadow_tes
 
         try {
             //Reflection Rays
-            var reflection = new Ray(
-                vec3ToVec4(closest_intersection.getPosition(), 1),
-                normalize(vec3ToVec4(subtract(scale_vec(2 * dot(n, v), n), v), 0))
-            );
+            var reflection = reflect(closest_intersection.getPosition(),v,n);
             reflection.isInsideBall = ray.isInsideBall;
         }
         catch (e) {
             console.log("catch error 1")
+            console.log(e)
             console.log(n)
             console.log(v)
             console.log(closest_intersection)
@@ -487,11 +472,11 @@ Raytracer.prototype.trace = function (ray, number_of_recursions_deep, shadow_tes
         pix_color = add(pix_color, scale_vec(closest.k_r, this.trace(reflection, number_of_recursions_deep+1)));
 
         //Refraction Rays
-        /*var refraction = closest_intersection.getRefractedRay();
+        var refraction = closest_intersection.getRefractedRay();
         if (refraction) {
             refraction.isInsideBall = !ray.isInsideBall;
             pix_color = add(pix_color, scale_vec(closest.k_refract, this.trace(refraction, number_of_recursions_deep+1)));
-        }*/
+        }
         return clamp01(pix_color);
     }
     //Return the background colour only if its the first ray
