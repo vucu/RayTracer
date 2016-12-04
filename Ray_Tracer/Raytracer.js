@@ -481,7 +481,8 @@ Raytracer.prototype.trace = function (ray, number_of_recursions_deep, shadow_tes
             refraction_color = scale_vec(closest.k_refract, this.trace(refraction, number_of_recursions_deep+1));
         }
 
-        var pix_color = add(add(surface_color, reflection_color), refraction_color);
+        var r_color = mult_3_coeffs(complement, add(reflection_color, refraction_color)).concat(1)
+        var pix_color = add(surface_color, r_color);
         return clamp01(pix_color);
     }
     //Return the background colour only if its the first ray
