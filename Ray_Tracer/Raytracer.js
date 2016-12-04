@@ -346,13 +346,16 @@ Raytracer.prototype.getDir = function (ix, iy) {
     return dir4;
 }
 
-Raytracer.prototype.getDiffuseAndSpecularLighting = function (closest_intersection) {
+Raytracer.prototype.getSurfaceColor = function (closest_intersection) {
     // Init
     var closest = closest_intersection.ball;
     var pix_color = vec4(0,0,0,1);
 
     var n = normalize(toVec3(closest_intersection.normal));
     var v = normalize(subtract(toVec3(closest_intersection.ray.origin), closest_intersection.getPosition()));
+
+    // Ambient
+    pix_color = vec3ToVec4(scale_vec(closest.k_a, closest.color), 1);
 
     //Compute the shadow ray for every light sources
     for (i=0;i<this.anim.graphicsState.lights.length;i++) {
@@ -450,9 +453,8 @@ Raytracer.prototype.trace = function (ray, number_of_recursions_deep, shadow_tes
         var closest = closest_intersection.ball;
 
         //Start computing the pixel color
-        var pix_color = vec3ToVec4(scale_vec(closest.k_a, closest.color), 1);
-        var diffuseAndSpecularColor = this.getDiffuseAndSpecularLighting(closest_intersection);
-        pix_color = add(pix_color, diffuseAndSpecularColor);
+        var surface_color = this.getSurfaceColor(closest_intersection);
+        var complement = vec4(1.0 - surface_color[0], 1.0 - surface_color[1], 1.0 - surface_color[2],1)
 
         var n = normalize(toVec3(closest_intersection.normal));
         var v = normalize(subtract(toVec3(closest_intersection.ray.origin), closest_intersection.getPosition()));
@@ -469,14 +471,17 @@ Raytracer.prototype.trace = function (ray, number_of_recursions_deep, shadow_tes
             console.log(v)
             console.log(closest_intersection)
         }
-        pix_color = add(pix_color, scale_vec(closest.k_r, this.trace(reflection, number_of_recursions_deep+1)));
+        var reflection_color = scale_vec(closest.k_r, this.trace(reflection, number_of_recursions_deep+1));
 
         //Refraction Rays
         var refraction = closest_intersection.getRefractedRay();
+        var refraction_color = vec4(0,0,0,1);
         if (refraction) {
             refraction.isInsideBall = !ray.isInsideBall;
-            pix_color = add(pix_color, scale_vec(closest.k_refract, this.trace(refraction, number_of_recursions_deep+1)));
+            refraction_color = scale_vec(closest.k_refract, this.trace(refraction, number_of_recursions_deep+1));
         }
+
+        var pix_color = add(add(surface_color, reflection_color), refraction_color);
         return clamp01(pix_color);
     }
     //Return the background colour only if its the first ray
