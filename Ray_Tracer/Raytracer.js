@@ -22,6 +22,15 @@ Intersection.prototype.isIntersected = function () {
     else return false;
 }
 
+Intersection.prototype.getReflectedRay = function () {
+    var V = normalize(subtract(toVec3(this.ray.origin), this.getPosition()));
+    var N = normalize(toVec3(this.normal));
+
+    var dir = normalize(vec3ToVec4(subtract(scale_vec(2 * dot(N, V), N), V), 0));
+
+    return new Ray(this.getPosition().concat(1.0), dir);
+}
+
 Intersection.prototype.getRefractedRay = function () {
     // Initial refraction
     var relativeRefractIndex = this.ball.refract_index;
@@ -54,9 +63,6 @@ function Ray(origin, dir) {
     else this.origin = vec4(0,0,0,1);
     if (dir) this.dir = dir;
     else this.dir = vec4(0,0,0,0);
-
-    // For refraction
-    this.isInsideBall = false;
 }
 
 Ray.prototype.getPosition = function (t) {
@@ -89,17 +95,6 @@ Ray.prototype.getInvert = function () {
         this.origin,
         vec4(-this.dir[0],-this.dir[1],-this.dir[2],0)
     );
-}
-
-function reflect(at, V ,N) {
-    var V = toVec3(V);
-    var N = toVec3(N);
-    var at = toVec3(at);
-
-    var dir = normalize(vec3ToVec4(subtract(scale_vec(2 * dot(N, V), N), V), 0));
-    var origin = vec3ToVec4(at, 1);
-
-    return new Ray(origin, dir);
 }
 
 // CS 174a Project 3 Ray Tracer Skeleton
@@ -427,21 +422,8 @@ Raytracer.prototype.trace = function (ray, number_of_recursions_deep, shadow_tes
         var surface_color = this.getSurfaceColor(closest_intersection);
         var complement = vec4(1.0 - surface_color[0], 1.0 - surface_color[1], 1.0 - surface_color[2],1)
 
-        var n = normalize(toVec3(closest_intersection.normal));
-        var v = normalize(subtract(toVec3(closest_intersection.ray.origin), closest_intersection.getPosition()));
-
-        try {
-            //Reflection Rays
-            var reflection = reflect(closest_intersection.getPosition(),v,n);
-            reflection.isInsideBall = ray.isInsideBall;
-        }
-        catch (e) {
-            console.log("catch error 1")
-            console.log(e)
-            console.log(n)
-            console.log(v)
-            console.log(closest_intersection)
-        }
+        //Reflection Rays
+        var reflection = closest_intersection.getReflectedRay();
         var reflection_color = scale_vec(closest.k_r, this.trace(reflection, number_of_recursions_deep+1));
 
         //Refraction Rays
