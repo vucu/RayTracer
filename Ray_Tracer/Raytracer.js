@@ -9,9 +9,6 @@ function Intersection() {
     this.t = Number.POSITIVE_INFINITY;
     this.normal = vec4(0,0,0,0);
     this.ray = undefined;
-
-    // Helper values
-    this.normalFlipped = vec4(0,0,0,0);
 }
 
 Intersection.prototype.getPosition = function () {
@@ -22,6 +19,7 @@ Intersection.prototype.isIntersected = function () {
     else return false;
 }
 
+// Find reflected ray at intersection point
 Intersection.prototype.getReflectedRay = function () {
     var V = normalize(subtract(toVec3(this.ray.origin), this.getPosition()));
     var N = normalize(toVec3(this.normal));
@@ -31,6 +29,7 @@ Intersection.prototype.getReflectedRay = function () {
     return new Ray(this.getPosition().concat(1.0), dir);
 }
 
+// Find refracted ray at intersection point
 Intersection.prototype.getRefractedRay = function () {
     var r = this.ball.refract_index;;
     var I = normalize(toVec3(this.ray.dir));
@@ -114,7 +113,6 @@ Ball.prototype.intersect = function (ray, existing_intersection, minimum_dist) {
     // TODO:  Given a ray, check if this Ball is in its path.  Recieves as an argument a record of the nearest intersection found
     //        so far, updates it if needed and returns it.  Only counts intersections that are at least a given distance ahead along the ray.
     //        An interection object is assumed to store a Ball pointer, a t distance value along the ray, and a normal.
-    // isRefraction: Used for refraction.
     var intersection = new Intersection();
     intersection.ray = ray;
     intersection.ball = this;
@@ -173,8 +171,6 @@ Ball.prototype.intersect = function (ray, existing_intersection, minimum_dist) {
             }
 
             existing_intersection.normal = normal;
-            existing_intersection.normalFlipped = normalFlipped;
-
         }
     }
 
