@@ -14,17 +14,13 @@ function Intersection() {
 Intersection.prototype.getPosition = function () {
     return this.ray.getPositionVec3(this.t);
 }
-Intersection.prototype.isIntersected = function () {
-    if (this.ball) return true;
-    else return false;
-}
 
 // Find reflected ray at intersection point
 Intersection.prototype.getReflectedRay = function () {
     var V = normalize(subtract(toVec3(this.ray.origin), this.getPosition()));
     var N = normalize(toVec3(this.normal));
 
-    var dir = normalize(vec3ToVec4(subtract(scale_vec(2 * dot(N, V), N), V), 0));
+    var dir = normalize(subtract(scale_vec(2 * dot(N, V), N), V)).concat(0.0);
 
     return new Ray(this.getPosition().concat(1.0), dir);
 }
@@ -147,7 +143,7 @@ Ball.prototype.intersect = function (ray, existing_intersection, minimum_dist) {
 
         intersection.t = t;
         // Compare with the current intersection, whichever closer is recognized
-        if(!existing_intersection || existing_intersection.isIntersected() == false || intersection.t < existing_intersection.t)
+        if(!existing_intersection || !existing_intersection.ball || intersection.t < existing_intersection.t)
         {
             existing_intersection = new Intersection();
             existing_intersection.ray = intersection.ray;
@@ -308,7 +304,7 @@ Raytracer.prototype.getSurfaceColor = function (closest_intersection) {
     var color;
 
     // Ambient
-    color = vec3ToVec4(scale_vec(closest.k_a, closest.color), 1);
+    color = scale_vec(closest.k_a, closest.color).concat(1.0);
 
     //Compute the shadow ray for every light sources
     for (i=0;i<this.anim.graphicsState.lights.length;i++) {
@@ -318,7 +314,7 @@ Raytracer.prototype.getSurfaceColor = function (closest_intersection) {
         var light_direction3_n = normalize(light_direction3);
         var dotProduct = dot(toVec3(closest_intersection.normal),light_direction3_n)
         var shadowRay = new Ray(closest_intersection.getPosition(),light_direction3_n);
-        var light_direction = vec3ToVec4(subtract(toVec3(light.position), closest_intersection.getPosition()), 0.0);
+        var light_direction = subtract(toVec3(light.position), closest_intersection.getPosition()).concat(0.0);
 
         var j;
         var shadow_intersection = new Intersection();
@@ -330,7 +326,7 @@ Raytracer.prototype.getSurfaceColor = function (closest_intersection) {
         // Check if the ray is in shadow
         var shadowCheck = false;
         if (dotProduct<0) shadowCheck = true;
-        if (shadow_intersection.isIntersected()) {
+        if (shadow_intersection.ball) {
             var distance = shadow_intersection.ray.getDistance(shadow_intersection.t);
             if (distance < light_distance) shadowCheck = true;
         }
@@ -347,7 +343,7 @@ Raytracer.prototype.getSurfaceColor = function (closest_intersection) {
             //Diffuse
             if(NL > 0)
             {
-                var combined_color = mult(light.color, vec3ToVec4(closest.color, 1.0))
+                var combined_color = mult(light.color, closest.color.concat(1.0));
                 var added_color = scale_vec(closest.k_d * NL, combined_color);
                 color = add(color, added_color)
             }
@@ -392,11 +388,11 @@ Raytracer.prototype.trace = function (ray, number_of_recursions_deep, shadow_tes
         closest_intersection = ball.intersect(ray, closest_intersection, min_dist);
     }
 
-    if (!closest_intersection.isIntersected())
+    if (!closest_intersection.ball)
         return mult_3_coeffs(this.ambient, background_functions[curr_background_function](ray)).concat(1);
 
     //Do the tracing only if we have an intersection
-    if(closest_intersection.isIntersected()) {
+    if(closest_intersection.ball) {
         //Get the closest ball
         var closest = closest_intersection.ball;
 
