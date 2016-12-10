@@ -264,7 +264,7 @@ function subtract( u, v )
     }
     else {
         if ( u.length != v.length ) {
-            throw "subtract(): vectors are not the same length";
+            throw "subtract(): vectors are not the same length. Vector are " + u + " and " + v;
         }
 
         for ( var i = 0; i < u.length; ++i ) {
