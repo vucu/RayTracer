@@ -69,11 +69,6 @@ function vec4( x = 0.0, y = 0.0, z = 0.0, w = 1.0 )
     // return result.splice( 0, 4 );
 }
 
-function vec3ToVec4( v3, c)
-{
-    return vec4(v3[0], v3[1], v3[2], c);
-}
-
 //----------------------------------------------------------------------------
 //
 //  Matrix Constructors
@@ -269,7 +264,7 @@ function subtract( u, v )
     }
     else {
         if ( u.length != v.length ) {
-            throw "subtract(): vectors are not the same length";
+            throw "subtract(): vectors are not the same length. Vector are " + u + " and " + v;
         }
 
         for ( var i = 0; i < u.length; ++i ) {

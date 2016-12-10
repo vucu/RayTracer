@@ -9,56 +9,49 @@ function Intersection() {
     this.t = Number.POSITIVE_INFINITY;
     this.normal = vec4(0,0,0,0);
     this.ray = undefined;
-
-    // Helper values
-    this.normalFlipped = vec4(0,0,0,0);
 }
 
 Intersection.prototype.getPosition = function () {
-    return this.ray.getPositionVec3(this.t);
-}
-Intersection.prototype.isIntersected = function () {
-    if (this.ball) return true;
-    else return false;
+    return this.ray.getPosition(this.t);
 }
 
+Intersection.prototype.getPosition3 = function () {
+    return this.ray.getPosition3(this.t);
+}
+
+// Find reflected ray at intersection point
 Intersection.prototype.getReflectedRay = function () {
-    var V = normalize(subtract(toVec3(this.ray.origin), this.getPosition()));
+    var V = normalize(subtract(this.ray.getOrigin3(), this.getPosition3()));
     var N = normalize(toVec3(this.normal));
 
-    var dir = normalize(vec3ToVec4(subtract(scale_vec(2 * dot(N, V), N), V), 0));
+    var dir = normalize(subtract(scale_vec(2 * dot(N, V), N), V)).concat(0.0);
 
-    return new Ray(this.getPosition().concat(1.0), dir);
+    return new Ray(this.getPosition3().concat(1.0), dir);
 }
 
+// Find refracted ray at intersection point
 Intersection.prototype.getRefractedRay = function () {
-    // Initial refraction
-    var relativeRefractIndex = this.ball.refract_index;
-    var eta = this.ball.refract_index;;
+    var r = this.ball.refract_index;;
     var I = normalize(toVec3(this.ray.dir));
     var N = normalize(toVec3(this.normal));
-
-    // DEBUG
     if (Math.abs(dot(I,N))<=0.01) return;
 
-    var c1 = -dot(I,N);                      // cos(I,n)
-    var cs2 = 1 - eta * eta * (1 - c1 * c1);
-
-    if (cs2 < 0) {
-        return;		/* total internal reflection */
+    var c = -dot(I,N);                     
+    var costheta2 = 1 - r * r * (1 - c * c);
+    if (costheta2 < 0) {
+        return;	
     }
-
-    var v1 = scale_vec(eta, I);
-    var v2 = scale_vec(eta * c1 - Math.sqrt(cs2), N);
+    var v1 = scale_vec(r, I);
+    var v2 = scale_vec(r * c - Math.sqrt(costheta2), N);
     var T = add(v1,v2);
 
-    return new Ray(this.getPosition().concat(1), T.concat(0));
+    return new Ray(this.getPosition3().concat(1), T.concat(0));
 }
 
 // Ray
 function Ray(origin, dir) {
-    if (origin.length !== 4) origin[3]=1;
-    if (origin.dir !== 4) dir[3]=0;
+    if (origin.length !== 4) throw "origin must have length 4";
+    if (dir.length !== 4) throw "dir must have length 4";
     if (origin) this.origin = origin;
     else this.origin = vec4(0,0,0,1);
     if (dir) this.dir = dir;
@@ -69,23 +62,23 @@ Ray.prototype.getPosition = function (t) {
     if (typeof t === 'undefined') throw "Error: Must define t";
     return add(this.origin,scale_vec(t, this.dir));
 }
-Ray.prototype.getPositionVec3 = function (t) {
+Ray.prototype.getPosition3 = function (t) {
     if (typeof t === 'undefined') throw "Error: Must define t";
     var v4 = add(this.origin,scale_vec(t, this.dir));
     return vec3(v4[0], v4[1], v4[2]);
 }
 
-Ray.prototype.getOriginVec3 = function () {
+Ray.prototype.getOrigin3 = function () {
     return vec3(this.origin[0], this.origin[1], this.origin[2]);
 }
-Ray.prototype.getDirVec3 = function () {
+Ray.prototype.getDir3 = function () {
     return vec3(this.dir[0], this.dir[1], this.dir[2]);
 }
 
 Ray.prototype.getDistance = function (t) {
     if (typeof t === 'undefined') throw "Error: Must define t";
-    var begin = toVec3(this.origin);
-    var end = this.getPositionVec3(t);
+    var begin = this.getOrigin3();
+    var end = this.getPosition3(t);
     var offset = subtract(end,begin);
     return length(offset);
 }
@@ -120,7 +113,6 @@ Ball.prototype.intersect = function (ray, existing_intersection, minimum_dist) {
     // TODO:  Given a ray, check if this Ball is in its path.  Recieves as an argument a record of the nearest intersection found
     //        so far, updates it if needed and returns it.  Only counts intersections that are at least a given distance ahead along the ray.
     //        An interection object is assumed to store a Ball pointer, a t distance value along the ray, and a normal.
-    // isRefraction: Used for refraction.
     var intersection = new Intersection();
     intersection.ray = ray;
     intersection.ball = this;
@@ -132,9 +124,9 @@ Ball.prototype.intersect = function (ray, existing_intersection, minimum_dist) {
     );
 
     // Find the equation
-    var a = dot(ray_inverse.getDirVec3(), ray_inverse.getDirVec3());
-    var b = dot(ray_inverse.getOriginVec3(), ray_inverse.getDirVec3());
-    var c = dot(ray_inverse.getOriginVec3(), ray_inverse.getOriginVec3()) - 1;
+    var a = dot(ray_inverse.getDir3(), ray_inverse.getDir3());
+    var b = dot(ray_inverse.getOrigin3(), ray_inverse.getDir3());
+    var c = dot(ray_inverse.getOrigin3(), ray_inverse.getOrigin3()) - 1;
     var discriminant = (b * b) - (a * c);
 
     // There's an intersection
@@ -155,7 +147,7 @@ Ball.prototype.intersect = function (ray, existing_intersection, minimum_dist) {
 
         intersection.t = t;
         // Compare with the current intersection, whichever closer is recognized
-        if(!existing_intersection || existing_intersection.isIntersected() == false || intersection.t < existing_intersection.t)
+        if(!existing_intersection || !existing_intersection.ball || intersection.t < existing_intersection.t)
         {
             existing_intersection = new Intersection();
             existing_intersection.ray = intersection.ray;
@@ -172,15 +164,13 @@ Ball.prototype.intersect = function (ray, existing_intersection, minimum_dist) {
             normalFlipped = scale_vec(-1, normal)
 
             // Check interior, if it is, flip the normal
-            if (dot(toVec3(ray.dir),toVec3(normal)) > 0) {
+            if (dot(ray.getDir3(),toVec3(normal)) > 0) {
                 var temp = normal;
                 normal = normalFlipped;
                 normalFlipped = temp;
             }
 
             existing_intersection.normal = normal;
-            existing_intersection.normalFlipped = normalFlipped;
-
         }
     }
 
@@ -315,71 +305,60 @@ Raytracer.prototype.getDir = function (ix, iy) {
 Raytracer.prototype.getSurfaceColor = function (closest_intersection) {
     // Init
     var closest = closest_intersection.ball;
-    var pix_color = vec4(0,0,0,1);
-
-    var n = normalize(toVec3(closest_intersection.normal));
-    var v = normalize(subtract(toVec3(closest_intersection.ray.origin), closest_intersection.getPosition()));
+    var color;
 
     // Ambient
-    pix_color = vec3ToVec4(scale_vec(closest.k_a, closest.color), 1);
+    color = scale_vec(closest.k_a, closest.color).concat(1.0);
 
     //Compute the shadow ray for every light sources
     for (i=0;i<this.anim.graphicsState.lights.length;i++) {
         var light = this.anim.graphicsState.lights[i];
-        var lightOffset = subtract(toVec3(light.position), closest_intersection.getPosition());
-        var lightDistance = length(lightOffset);
-        var lightDirection = normalize(lightOffset);
-        var dotProduct = dot(toVec3(closest_intersection.normal),lightDirection)
-        var shadowRay = new Ray(closest_intersection.getPosition(),lightDirection);
+        var light_direction3 = subtract(toVec3(light.position), closest_intersection.getPosition3());
+        var light_distance = length(light_direction3);
+        var L = normalize(light_direction3);
+        var N = normalize(toVec3(closest_intersection.normal));
+        var NL = dot(N,L);
+        var shadow_ray = new Ray(closest_intersection.getPosition(),L.concat(0.0));
 
-        var light_origin = vec3ToVec4(closest_intersection.getPosition(), 1.0);
-        var light_dir = vec3ToVec4(subtract(toVec3(light.position), closest_intersection.getPosition()), 0.0);
-
-        var light_ray = new Ray(light_origin, light_dir);
-        var light_hit = new Intersection();
         var j;
+        var shadow_intersection = new Intersection();
         for (j=0;j<this.balls.length;j++) {
             var ball = this.balls[j]
-            light_hit = ball.intersect(light_ray, light_hit, 0.0001);
-        }
-        var shadowHit = new Intersection();
-        for (j=0;j<this.balls.length;j++) {
-            var ball = this.balls[j]
-            shadowHit = ball.intersect(shadowRay, shadowHit, 0.0001);
+            shadow_intersection = ball.intersect(shadow_ray, shadow_intersection, 0.0001);
         }
 
-        var isInShadow = false;
-        if (dotProduct<0) isInShadow = true;
-        if (shadowHit.isIntersected()) {
-            var distance = shadowHit.ray.getDistance(shadowHit.t);
-            if (distance < lightDistance) isInShadow = true;
+        // Check if the ray is in shadow
+        var shadowCheck = false;
+        if (NL<0) shadowCheck = true;
+        if (shadow_intersection.ball) {
+            var distance = shadow_intersection.ray.getDistance(shadow_intersection.t);
+            if (distance < light_distance) shadowCheck = true;
         }
 
-        //Shadow Rays
-        if(!isInShadow)
+        // Shadow Rays
+        if(!shadowCheck)
         {
-            var l = normalize(toVec3(light_dir));
-            var n_dot_l = dot(n, l);
-            var r = normalize(subtract(scale_vec(2.0*n_dot_l, n), l));
-            var r_dot_v = dot(r, v);
+            var V = normalize(subtract(toVec3(closest_intersection.ray.origin), closest_intersection.getPosition3()));
+            var R = normalize(subtract(scale_vec(2.0*NL, N), L));
+            var RV = dot(R, V);
             //Diffuse
-            if(n_dot_l > 0)
+            if(NL > 0)
             {
-                var combined_color = mult(light.color, vec3ToVec4(closest.color, 1.0))
-                var added_color = scale_vec(closest.k_d * n_dot_l, combined_color);
-                pix_color = add(pix_color, added_color)
+                var combined_color = mult(light.color, closest.color.concat(1.0));
+                var added_color = scale_vec(closest.k_d * NL, combined_color);
+                color = add(color, added_color)
             }
             //Specular
-            if(r_dot_v > 0)
+            if(RV > 0)
             {
-                var added_color = scale_vec(closest.k_s * Math.pow(r_dot_v, closest.n),light.color) ;
-                pix_color = add(pix_color, added_color)
+                var added_color = scale_vec(closest.k_s * Math.pow(RV, closest.n),light.color) ;
+                color = add(color, added_color)
             }
         }
     }
 
 
-    return clamp01(pix_color);
+    return clamp01(color);
 }
 
 Raytracer.prototype.trace = function (ray, number_of_recursions_deep, shadow_test_light_source) {
@@ -410,11 +389,11 @@ Raytracer.prototype.trace = function (ray, number_of_recursions_deep, shadow_tes
         closest_intersection = ball.intersect(ray, closest_intersection, min_dist);
     }
 
-    if (!closest_intersection.isIntersected())
+    if (!closest_intersection.ball)
         return mult_3_coeffs(this.ambient, background_functions[curr_background_function](ray)).concat(1);
 
     //Do the tracing only if we have an intersection
-    if(closest_intersection.isIntersected()) {
+    if(closest_intersection.ball) {
         //Get the closest ball
         var closest = closest_intersection.ball;
 
