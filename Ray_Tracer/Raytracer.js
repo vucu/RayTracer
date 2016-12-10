@@ -361,7 +361,7 @@ Raytracer.prototype.getSurfaceColor = function (closest_intersection) {
     return clamp01(color);
 }
 
-Raytracer.prototype.trace = function (ray, number_of_recursions_deep, shadow_test_light_source) {
+Raytracer.prototype.trace = function (ray, recursions, shadow_test_light_source) {
     // TODO:  Given a ray, return the color in that ray's path.  Could be originating from the camera itself or from a secondary reflection
     //        or refraction off a ball.  Call Ball.prototype.intersect on each ball to determine the nearest ball struck, if any, and perform
     //        vector math (namely the Phong reflection formula) using the resulting intersection record to figure out the influence of light on
@@ -371,12 +371,12 @@ Raytracer.prototype.trace = function (ray, number_of_recursions_deep, shadow_tes
     //        instead just store color_remaining, the pixel's remaining potential to be lit up more... proceeding only if that's still significant.
     //        If a light source for shadow testing is provided as the optional final argument, this function's objective simplifies to just
     //        checking the path directly to a light source for obstructions.
-    if(number_of_recursions_deep >= 7)
-        return mult_3_coeffs(this.ambient, background_functions[curr_background_function](ray)).concat(1);
+    if (recursions >= 7)
+        return vec4(0.0, 0.0, 0.0, 0.0);
 
+    // Find intersection
     var closest_intersection = new Intersection();
-    var type;
-    if(number_of_recursions_deep == 0)
+    if(recursions == 0)
     {
         min_dist = 1.0;     // original
     } else
@@ -389,39 +389,38 @@ Raytracer.prototype.trace = function (ray, number_of_recursions_deep, shadow_tes
         closest_intersection = ball.intersect(ray, closest_intersection, min_dist);
     }
 
-    if (!closest_intersection.ball)
-        return mult_3_coeffs(this.ambient, background_functions[curr_background_function](ray)).concat(1);
+    // No intersection, return the background color for first ray
+    if (!closest_intersection.ball) {
+        if (recursions == 0)
+            return mult_3_coeffs(this.ambient, background_functions[curr_background_function](ray)).concat(1);
+        else
+            return vec4(0.0, 0.0, 0.0, 0.0);
+    }
 
-    //Do the tracing only if we have an intersection
+    // Has intersection, ray tracing
     if(closest_intersection.ball) {
-        //Get the closest ball
-        var closest = closest_intersection.ball;
+        // Get the closest ball
+        var closest_ball = closest_intersection.ball;
 
-        //Start computing the pixel color
+        // Surface color
         var surface_color = this.getSurfaceColor(closest_intersection);
         var complement = vec4(1.0 - surface_color[0], 1.0 - surface_color[1], 1.0 - surface_color[2],1)
 
-        //Reflection Rays
+        // Reflection
         var reflection = closest_intersection.getReflectedRay();
-        var reflection_color = scale_vec(closest.k_r, this.trace(reflection, number_of_recursions_deep+1));
+        var reflection_color = scale_vec(closest_ball.k_r, this.trace(reflection, recursions+1));
 
-        //Refraction Rays
+        // Refraction
         var refraction = closest_intersection.getRefractedRay();
         var refraction_color = vec4(0,0,0,1);
         if (refraction) {
-            refraction_color = scale_vec(closest.k_refract, this.trace(refraction, number_of_recursions_deep+1));
+            refraction_color = scale_vec(closest_ball.k_refract, this.trace(refraction, recursions+1));
         }
 
         var r_color = mult_3_coeffs(complement, add(reflection_color, refraction_color)).concat(1)
         var pixel_color = add(surface_color, r_color);
         return clamp01(pixel_color);
     }
-    //Return the background colour only if its the first ray
-    if(number_of_recursions_deep == 0)
-        return this.ambient;
-    else
-        return vec4();
-
 }
 
 Raytracer.prototype.parseLine = function (tokens)            // Load the text lines into variables
