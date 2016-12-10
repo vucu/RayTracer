@@ -32,24 +32,18 @@ Intersection.prototype.getReflectedRay = function () {
 }
 
 Intersection.prototype.getRefractedRay = function () {
-    // Initial refraction
-    var relativeRefractIndex = this.ball.refract_index;
-    var eta = this.ball.refract_index;;
+    var r = this.ball.refract_index;;
     var I = normalize(toVec3(this.ray.dir));
     var N = normalize(toVec3(this.normal));
-
-    // DEBUG
     if (Math.abs(dot(I,N))<=0.01) return;
 
-    var c1 = -dot(I,N);                      // cos(I,n)
-    var cs2 = 1 - eta * eta * (1 - c1 * c1);
-
-    if (cs2 < 0) {
-        return;		/* total internal reflection */
+    var c = -dot(I,N);                     
+    var costheta2 = 1 - r * r * (1 - c * c);
+    if (costheta2 < 0) {
+        return;	
     }
-
-    var v1 = scale_vec(eta, I);
-    var v2 = scale_vec(eta * c1 - Math.sqrt(cs2), N);
+    var v1 = scale_vec(r, I);
+    var v2 = scale_vec(r * c - Math.sqrt(costheta2), N);
     var T = add(v1,v2);
 
     return new Ray(this.getPosition().concat(1), T.concat(0));
@@ -315,71 +309,63 @@ Raytracer.prototype.getDir = function (ix, iy) {
 Raytracer.prototype.getSurfaceColor = function (closest_intersection) {
     // Init
     var closest = closest_intersection.ball;
-    var pix_color = vec4(0,0,0,1);
-
-    var n = normalize(toVec3(closest_intersection.normal));
-    var v = normalize(subtract(toVec3(closest_intersection.ray.origin), closest_intersection.getPosition()));
+    var color;
 
     // Ambient
-    pix_color = vec3ToVec4(scale_vec(closest.k_a, closest.color), 1);
+    color = vec3ToVec4(scale_vec(closest.k_a, closest.color), 1);
 
     //Compute the shadow ray for every light sources
     for (i=0;i<this.anim.graphicsState.lights.length;i++) {
         var light = this.anim.graphicsState.lights[i];
-        var lightOffset = subtract(toVec3(light.position), closest_intersection.getPosition());
-        var lightDistance = length(lightOffset);
-        var lightDirection = normalize(lightOffset);
-        var dotProduct = dot(toVec3(closest_intersection.normal),lightDirection)
-        var shadowRay = new Ray(closest_intersection.getPosition(),lightDirection);
+        var light_direction3 = subtract(toVec3(light.position), closest_intersection.getPosition());
+        var light_distance = length(light_direction3);
+        var light_direction3_n = normalize(light_direction3);
+        var dotProduct = dot(toVec3(closest_intersection.normal),light_direction3_n)
+        var shadowRay = new Ray(closest_intersection.getPosition(),light_direction3_n);
+        var light_direction = vec3ToVec4(subtract(toVec3(light.position), closest_intersection.getPosition()), 0.0);
 
-        var light_origin = vec3ToVec4(closest_intersection.getPosition(), 1.0);
-        var light_dir = vec3ToVec4(subtract(toVec3(light.position), closest_intersection.getPosition()), 0.0);
-
-        var light_ray = new Ray(light_origin, light_dir);
-        var light_hit = new Intersection();
         var j;
+        var shadow_intersection = new Intersection();
         for (j=0;j<this.balls.length;j++) {
             var ball = this.balls[j]
-            light_hit = ball.intersect(light_ray, light_hit, 0.0001);
-        }
-        var shadowHit = new Intersection();
-        for (j=0;j<this.balls.length;j++) {
-            var ball = this.balls[j]
-            shadowHit = ball.intersect(shadowRay, shadowHit, 0.0001);
+            shadow_intersection = ball.intersect(shadowRay, shadow_intersection, 0.0001);
         }
 
-        var isInShadow = false;
-        if (dotProduct<0) isInShadow = true;
-        if (shadowHit.isIntersected()) {
-            var distance = shadowHit.ray.getDistance(shadowHit.t);
-            if (distance < lightDistance) isInShadow = true;
+        // Check if the ray is in shadow
+        var shadowCheck = false;
+        if (dotProduct<0) shadowCheck = true;
+        if (shadow_intersection.isIntersected()) {
+            var distance = shadow_intersection.ray.getDistance(shadow_intersection.t);
+            if (distance < light_distance) shadowCheck = true;
         }
 
-        //Shadow Rays
-        if(!isInShadow)
+        // Shadow Rays
+        if(!shadowCheck)
         {
-            var l = normalize(toVec3(light_dir));
-            var n_dot_l = dot(n, l);
-            var r = normalize(subtract(scale_vec(2.0*n_dot_l, n), l));
-            var r_dot_v = dot(r, v);
+            var n = normalize(toVec3(closest_intersection.normal));
+            var v = normalize(subtract(toVec3(closest_intersection.ray.origin), closest_intersection.getPosition()));
+            var L = normalize(toVec3(light_direction));
+            var NL = dot(n, L);
+            var R = normalize(subtract(scale_vec(2.0*NL, n), L));
+            var RV = dot(R, v);
             //Diffuse
-            if(n_dot_l > 0)
+            if(NL > 0)
             {
                 var combined_color = mult(light.color, vec3ToVec4(closest.color, 1.0))
-                var added_color = scale_vec(closest.k_d * n_dot_l, combined_color);
-                pix_color = add(pix_color, added_color)
+                var added_color = scale_vec(closest.k_d * NL, combined_color);
+                color = add(color, added_color)
             }
             //Specular
-            if(r_dot_v > 0)
+            if(RV > 0)
             {
-                var added_color = scale_vec(closest.k_s * Math.pow(r_dot_v, closest.n),light.color) ;
-                pix_color = add(pix_color, added_color)
+                var added_color = scale_vec(closest.k_s * Math.pow(RV, closest.n),light.color) ;
+                color = add(color, added_color)
             }
         }
     }
 
 
-    return clamp01(pix_color);
+    return clamp01(color);
 }
 
 Raytracer.prototype.trace = function (ray, number_of_recursions_deep, shadow_test_light_source) {
