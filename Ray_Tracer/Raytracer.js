@@ -310,7 +310,7 @@ Raytracer.prototype.getSurfaceColor = function (closest_intersection) {
     // Ambient
     color = scale_vec(closest.k_a, closest.color).concat(1.0);
 
-    //Compute the shadow ray for every light sources
+    // Compute the shadow ray for every light sources
     for (i=0;i<this.anim.graphicsState.lights.length;i++) {
         var light = this.anim.graphicsState.lights[i];
         var light_direction3 = subtract(toVec3(light.position), closest_intersection.getPosition3());
@@ -335,20 +335,20 @@ Raytracer.prototype.getSurfaceColor = function (closest_intersection) {
             if (distance < light_distance) shadowCheck = true;
         }
 
-        // Shadow Rays
+        // Shadow rays
         if(!shadowCheck)
         {
             var V = normalize(subtract(toVec3(closest_intersection.ray.origin), closest_intersection.getPosition3()));
             var R = normalize(subtract(scale_vec(2.0*NL, N), L));
             var RV = dot(R, V);
-            //Diffuse
+            // Diffuse
             if(NL > 0)
             {
                 var combined_color = mult(light.color, closest.color.concat(1.0));
                 var added_color = scale_vec(closest.k_d * NL, combined_color);
                 color = add(color, added_color)
             }
-            //Specular
+            // Specular
             if(RV > 0)
             {
                 var added_color = scale_vec(closest.k_s * Math.pow(RV, closest.n),light.color) ;
@@ -376,6 +376,7 @@ Raytracer.prototype.trace = function (ray, recursions, shadow_test_light_source)
 
     // Find intersection
     var closest_intersection = new Intersection();
+    var min_dist;
     if(recursions == 0)
     {
         min_dist = 1.0;     // original
