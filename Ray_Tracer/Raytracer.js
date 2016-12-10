@@ -315,10 +315,10 @@ Raytracer.prototype.getSurfaceColor = function (closest_intersection) {
         var light = this.anim.graphicsState.lights[i];
         var light_direction3 = subtract(toVec3(light.position), closest_intersection.getPosition3());
         var light_distance = length(light_direction3);
-        var L = normalize(light_direction3);
+        var L = normalize(toVec3(light_direction3));
         var N = normalize(toVec3(closest_intersection.normal));
         var NL = dot(N,L);
-        var shadow_ray = new Ray(closest_intersection.getPosition(),L.concat(0.0));
+        var shadow_ray = new Ray(closest_intersection.getPosition(),light_direction3.concat(0.0));
 
         var j;
         var shadow_intersection = new Intersection();
@@ -328,15 +328,14 @@ Raytracer.prototype.getSurfaceColor = function (closest_intersection) {
         }
 
         // Check if the ray is in shadow
-        var shadowCheck = false;
-        if (NL<0) shadowCheck = true;
+        var shadow_check = false;
+        if (NL<0) shadow_check = true;
         if (shadow_intersection.ball) {
-            var distance = shadow_intersection.ray.getDistance(shadow_intersection.t);
-            if (distance < light_distance) shadowCheck = true;
+            if (shadow_intersection.t > 0.0 && shadow_intersection.t < 1.0) shadow_check = true;
         }
 
         // Shadow rays
-        if(!shadowCheck)
+        if(!shadow_check)
         {
             var V = normalize(subtract(toVec3(closest_intersection.ray.origin), closest_intersection.getPosition3()));
             var R = normalize(subtract(scale_vec(2.0*NL, N), L));
@@ -405,7 +404,7 @@ Raytracer.prototype.trace = function (ray, recursions, shadow_test_light_source)
 
         // Surface color
         var surface_color = this.getSurfaceColor(closest_intersection);
-        var complement = vec4(1.0 - surface_color[0], 1.0 - surface_color[1], 1.0 - surface_color[2],1)
+        var complement = vec4(1.0 - surface_color[0], 1.0 - surface_color[1], 1.0 - surface_color[2],1);
 
         // Reflection
         var reflection = closest_intersection.getReflectedRay();
@@ -418,7 +417,7 @@ Raytracer.prototype.trace = function (ray, recursions, shadow_test_light_source)
             refraction_color = scale_vec(closest_ball.k_refract, this.trace(refraction, recursions+1));
         }
 
-        var r_color = mult_3_coeffs(complement, add(reflection_color, refraction_color)).concat(1)
+        var r_color = mult_3_coeffs(complement, add(reflection_color, refraction_color)).concat(1);
         var pixel_color = add(surface_color, r_color);
         return clamp01(pixel_color);
     }
