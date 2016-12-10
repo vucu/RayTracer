@@ -409,7 +409,6 @@ Raytracer.prototype.trace = function (ray, number_of_recursions_deep, shadow_tes
         var refraction = closest_intersection.getRefractedRay();
         var refraction_color = vec4(0,0,0,1);
         if (refraction) {
-            refraction.isInsideBall = !ray.isInsideBall;
             refraction_color = scale_vec(closest.k_refract, this.trace(refraction, number_of_recursions_deep+1));
         }
 
