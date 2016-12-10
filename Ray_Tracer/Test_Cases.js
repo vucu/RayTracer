@@ -286,18 +286,7 @@ LIGHT  5 2 6   1   1 1
 LIGHT  6 4 2   1 0.4 1
 BACK    0.4 0.3 0.1
 AMBIENT 0.2 0.2 0.2
-`,
-testCustom1: `
-NEAR    1
-LEFT   -1
-RIGHT   1
-BOTTOM -1
-TOP     1
-RES     64 64
-SPHERE  0  0 -10   1 1 1   0.5 0 0   1 0 0 50 0 0 0.8
-LIGHT 0 0 0   0.3 0.3 0.3
-BACK    0   0   1
-AMBIENT 0.5 0.5 0.5`
+`
 };
 
 var load_case = function( i ) {   document.getElementById( "input_scene" ).value = test_cases[ i ];   }
