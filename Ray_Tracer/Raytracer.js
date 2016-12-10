@@ -381,7 +381,7 @@ Raytracer.prototype.trace = function (ray, number_of_recursions_deep, shadow_tes
         min_dist = 1.0;     // original
     } else
     {
-        min_dist = 0.0001;  // reflected rays
+        min_dist = 0.0001;  // reflected/refracted rays
     }
     var i;
     for (i=0;i<this.balls.length;i++) {
@@ -414,8 +414,8 @@ Raytracer.prototype.trace = function (ray, number_of_recursions_deep, shadow_tes
         }
 
         var r_color = mult_3_coeffs(complement, add(reflection_color, refraction_color)).concat(1)
-        var pix_color = add(surface_color, r_color);
-        return clamp01(pix_color);
+        var pixel_color = add(surface_color, r_color);
+        return clamp01(pixel_color);
     }
     //Return the background colour only if its the first ray
     if(number_of_recursions_deep == 0)
